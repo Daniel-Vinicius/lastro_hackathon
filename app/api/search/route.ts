@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
     precoMax: num(sp.get("precoMax")),
   };
 
-  const leads = buscarLeads(filtros);
-  const facetasData = facetas();
+  const leads = await buscarLeads(filtros);
+  const facetasData = await facetas();
 
   return Response.json({ leads, facetas: facetasData });
 }

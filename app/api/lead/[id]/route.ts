@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const lead = buscarLeadPorId(id);
+  const lead = await buscarLeadPorId(id);
 
   if (!lead) {
     return Response.json({ error: "Lead não encontrado" }, { status: 404 });

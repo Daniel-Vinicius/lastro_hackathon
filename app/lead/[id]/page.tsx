@@ -13,7 +13,7 @@ export default async function Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const lead = buscarLeadPorId(id);
+  const lead = await buscarLeadPorId(id);
   if (!lead) notFound();
 
   const { avaliacao } = lead;

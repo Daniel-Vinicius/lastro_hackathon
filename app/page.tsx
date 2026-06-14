@@ -2,9 +2,9 @@ import Link from "next/link";
 import { buscarLeads, facetas } from "@/lib/data";
 import RadarShell from "@/components/RadarShell";
 
-export default function Page() {
-  const leadsIniciais = buscarLeads({});
-  const facetasData = facetas();
+export default async function Page() {
+  const leadsIniciais = await buscarLeads({});
+  const facetasData = await facetas();
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">

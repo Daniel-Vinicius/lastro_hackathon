@@ -73,7 +73,7 @@ function resumoLead(lead: LeadComScore): string {
 
 /** Fallback determinístico (sem LLM) — usado se faltar API key ou a API falhar. */
 function briefingFallback(lead: LeadComScore): BriefingCaptacao {
-  const primeiro = lead.proprietario.split(" ")[0];
+  const primeiro = (lead.proprietario ?? "").split(" ")[0];
   const gap = Math.round(gapPreco(lead) * 100);
   return {
     porQueAgora: `${lead.avaliacao.principaisRazoes[0] ?? "Proprietário anunciando direto, sem imobiliária."} Score ${lead.avaliacao.score}/100 (${lead.avaliacao.tier}).`,

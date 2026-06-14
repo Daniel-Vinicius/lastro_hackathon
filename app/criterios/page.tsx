@@ -39,8 +39,8 @@ const SINAIS = [
   },
 ] as const;
 
-export default function CriteriosPage() {
-  const scores = buscarLeads({}).map((l) => l.avaliacao.score);
+export default async function CriteriosPage() {
+  const scores = (await buscarLeads({})).map((l) => l.avaliacao.score);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">

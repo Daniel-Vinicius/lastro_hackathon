@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "id obrigatório" }, { status: 400 });
   }
 
-  const lead = buscarLeadPorId(body.id);
+  const lead = await buscarLeadPorId(body.id);
   if (!lead) {
     return Response.json({ error: "Lead não encontrado" }, { status: 404 });
   }

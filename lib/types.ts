@@ -20,10 +20,10 @@ export interface PontoPreco {
 
 export interface Lead {
   id: string;
-  /** Nome do proprietário (mockado). */
-  proprietario: string;
-  /** Telefone do proprietário (mockado). */
-  telefone: string;
+  /** Nome do proprietário — presente só se houver listing particular. */
+  proprietario?: string;
+  /** Telefone do proprietário — presente só se houver listing particular. */
+  telefone?: string;
   bairro: string;
   cidade: string;
   uf: string;
@@ -51,6 +51,10 @@ export interface Lead {
   fonte: "sintetico" | "chavesnamao-real" | "spimovel-real";
   /** URL do anúncio real (quando veio de scrape). */
   anuncioUrl?: string;
+  /** Imobiliárias que anunciam o mesmo imóvel (Bloco G: pulverização cross-portal). */
+  anunciantes: string[];
+  /** Existe listing particular ativo — habilita o contato direto com o dono. */
+  temContatoDireto: boolean;
 }
 
 /** Filtros que o corretor aplica na busca (Tela A). */
