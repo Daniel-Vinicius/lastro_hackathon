@@ -1,28 +1,31 @@
-// Scrape-once do SP Imóvel → funde leads REAIS em data/leads.json.
-// Rodável com: node scripts/scrape-spimovel.mjs
-//
-// Diferente do Chaves na Mão, o SP Imóvel mascara o preço na busca (slug "rs1" =
-// R$1). Então: a BUSCA dá só a lista de URLs (via ItemList ld+json) e o slug
-// (tipo/quartos/vagas/área/bairro); o PREÇO real e as FOTOS reais vêm da página de
-// DETALHE (preço no HTML `valor-historico`; fotos no ld+json Apartment.image[]).
+// Scrape do SP Imóvel → upsert no Neon via lib/db/ingest.
+// Rodável com: npm run scrape:spi (ou: npx tsx scripts/scrape-spimovel.mjs)
 //
 // REAL: id, anuncioUrl, precoAtual, tipo, area, quartos, vagas, bairro, fotos (galeria).
-// DERIVADO/ENRIQUECIDO: ver _scrape-utils. PORTAIS: só "SP Imóvel". Idempotente.
+// SP Imóvel NÃO tem datePosted → firstSeen = now (T0); diasNoAnuncio real a partir do T0+.
+// anuncianteTipo = "imobiliaria" (SP Imóvel é majoritariamente imobiliária).
+// Sem proprietario/telefone fake, sem reduções fabricadas.
 
+import { createRequire } from "module";
+import { fileURLToPath } from "url";
+import path from "path";
 import {
-  fetchHtml, parseLdJson, enriquecer, pm2PorBairro, heatByGap, mergeAndWrite,
-  TIPOS_VALIDOS, sleep,
+  fetchHtml, parseLdJson, pm2PorBairro, TIPOS_VALIDOS, sleep,
 } from "./_scrape-utils.mjs";
+
+const require = createRequire(import.meta.url);
+const { loadEnvConfig } = require("@next/env");
+loadEnvConfig(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
 
 const FONTE = "spimovel-real";
 const MAX_REAIS = 15;
+const PORTAL = "SP Imóvel";
+const ID_PREFIX = "spi";
 
-// Busca de apartamentos à venda em SP (FinalidadeId=1 venda; OrderByOption=7).
 const SEARCHES = [
   "https://www.spimovel.com.br/imoveis/?FinalidadeId=1&CategoriaId=1&TipoIds=2&OrderByOption=7",
 ];
 
-// Lista de URLs de anúncio (bloco ItemList do ld+json da busca).
 function listaUrls(html) {
   for (const d of parseLdJson(html)) {
     if (d?.["@type"] === "ItemList" && Array.isArray(d.itemListElement)) {
@@ -43,11 +46,9 @@ function tipoDeSlug(slug, name) {
   if ((name || "").toLowerCase().includes("cobertura")) return "cobertura";
   if (TIPOS_VALIDOS.has(t)) return t;
   if (["studio", "loft", "flat", "conjugado"].includes(t)) return "kitnet";
-  return null; // sala/galpao/terreno/predio → descarta
+  return null;
 }
 
-// Bairro acentuado: último item do BreadcrumbList (ex.: "Alto de Pinheiros", "Brás").
-// Fallback no bairro derivado do slug (sem acento) se o breadcrumb faltar/for genérico.
 const CRUMB_GENERICO = new Set([
   "home", "comprar", "alugar", "são paulo", "sao paulo", "centro", "apartamentos",
   "casas", "imóveis", "imoveis", "zona oeste", "zona leste", "zona sul", "zona norte",
@@ -65,31 +66,26 @@ function bairroDetalhe(html, fallback) {
   return fallback;
 }
 
-// Slug ex.: apartamento-venda-rs1-4quartos-4vagas-327m2-alto-de-pinheiros-sao-paulo-sao-paulo-sp
 function parseSlug(url) {
-  // remove o segmento "/{id}/" final antes de parsear (senão a cidade gruda no bairro)
   const slug = (url.split("/imovel/")[1] || "").replace(/\/\d+\/?$/, "").toLowerCase();
   const idNum = (url.match(/\/(\d+)\/?$/) || [])[1];
   const quartos = Number((slug.match(/(\d+)quartos?/) || [])[1]) || 0;
   const vagas = Number((slug.match(/(\d+)vagas?/) || [])[1]) || 0;
   const areaSlug = Number((slug.match(/(\d+)m2/) || [])[1]) || 0;
   const transacao = /-locacao-|-aluguel-/.test(slug) ? "aluguel" : "venda";
-  // bairro: o que está entre "{area}m2-" e o sufixo "{cidade}-{estado}-{uf}".
   let rest = slug.split(/\d+m2-/)[1] || "";
   if (/-sao-paulo-sao-paulo-sp$/.test(rest)) rest = rest.replace(/-sao-paulo-sao-paulo-sp$/, "");
-  else rest = rest.split("-").slice(0, -3).join("-"); // remove cidade-estado-uf genéricos
+  else rest = rest.split("-").slice(0, -3).join("-");
   const bairro = rest ? titleCase(rest.replace(/-/g, " ")) : "São Paulo";
   return { idNum, quartos, vagas, areaSlug, transacao, bairro, slug };
 }
 
-// Preço real: primeiro <div class="valor-historico">R$ X</div> com valor plausível.
 function precoDetalhe(html) {
   const vals = [...html.matchAll(/valor-historico[^>]*>\s*R\$\s*([\d.]+)/g)]
     .map((m) => parseInt(m[1].replace(/\./g, ""), 10));
   return vals.find((v) => v > 10000) || 0;
 }
 
-// Bloco ld+json do imóvel (pode vir como @type ["Product","Apartment"]).
 function imovelLd(html) {
   for (const d of parseLdJson(html)) {
     for (const it of Array.isArray(d) ? d : [d]) {
@@ -102,7 +98,13 @@ function imovelLd(html) {
 }
 
 async function main() {
-  // 1) URLs de anúncio das buscas
+  const { db, hasDb } = await import("../lib/db/index.js");
+  if (!hasDb || !db) {
+    console.error("⚠ NEON_POSTGRES_CONNECTION_STRING não definida — scraper SP Imóvel abortado.");
+    process.exit(0);
+  }
+  const { upsertMany } = await import("../lib/db/ingest.js");
+
   const urls = [];
   for (const s of SEARCHES) {
     try {
@@ -115,7 +117,6 @@ async function main() {
   const uniq = [...new Set(urls)];
   console.log(`  ${uniq.length} URLs de anúncio coletadas`);
 
-  // 2) detalhe por anúncio (preço + fotos reais) até MAX_REAIS
   const bases = [];
   for (const url of uniq) {
     if (bases.length >= MAX_REAIS) break;
@@ -135,7 +136,7 @@ async function main() {
       if (!(preco > 10000) || !(area > 0) || !fotos.length) {
         console.log(`    – pulando ${meta.idNum} (preço/área/foto ausente)`);
       } else {
-        const bairro = bairroDetalhe(html, meta.bairro); // acentuado via breadcrumb
+        const bairro = bairroDetalhe(html, meta.bairro);
         bases.push({
           idNum: meta.idNum, anuncioUrl: url, precoAtual: preco, tipo, area,
           quartos: meta.quartos, vagas: meta.vagas,
@@ -151,26 +152,38 @@ async function main() {
   }
 
   if (bases.length === 0) {
-    console.error("✗ Nenhum anúncio raspado do SP Imóvel (bloqueio/preços mascarados). leads.json NÃO foi alterado.");
+    console.error("✗ Nenhum anúncio raspado do SP Imóvel. Banco NÃO foi alterado.");
     process.exit(0);
   }
 
   const pm2De = pm2PorBairro(bases);
-  const heat = heatByGap(bases, pm2De);
-  const reais = bases.map((b) =>
-    enriquecer(b, {
-      heat: heat.get(b.idNum),
-      pm2Bairro: pm2De(b.bairro),
-      fonte: FONTE,
-      portalReal: "SP Imóvel",
-      idPrefix: "spi",
-    }),
-  );
+  const inputs = bases.map((b) => ({
+    bairro: b.bairro,
+    cidade: b.cidade,
+    uf: b.uf,
+    tipo: b.tipo,
+    transacao: b.transacao,
+    area: b.area,
+    quartos: b.quartos,
+    vagas: b.vagas,
+    precoEstimadoMercado: Math.round(pm2De(b.bairro) * b.area / 1000) * 1000,
+    portal: PORTAL,
+    portalListingId: b.idNum,
+    idPrefix: ID_PREFIX,
+    fonte: FONTE,
+    url: b.anuncioUrl,
+    anuncianteTipo: "imobiliaria",
+    fotos: b.fotos,
+    // SP Imóvel não tem datePosted → firstSeen = now (T0)
+    firstSeen: new Date(),
+    price: b.precoAtual,
+  }));
 
-  mergeAndWrite(reais, FONTE);
+  console.log(`\n💾 Upserting ${inputs.length} leads no banco...`);
+  await upsertMany(db, inputs);
 }
 
 main().catch((err) => {
-  console.error("✗ Erro fatal no scraper:", err);
+  console.error("✗ Erro fatal no scraper SP Imóvel:", err);
   process.exit(1);
 });

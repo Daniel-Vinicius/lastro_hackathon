@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LeadComScore } from "@/lib/types";
-import { brl, area, tipoLabel, tierRail } from "@/lib/format";
+import { brl, area, tipoLabel, tierRail, statusBadge, statusLabel, portalBadge } from "@/lib/format";
 import ScoreBadge from "./ScoreBadge";
 
 interface Props {
@@ -29,7 +29,28 @@ export default function LeadCard({ lead }: Props) {
             {lead.cidade}/{lead.uf}
           </p>
         </div>
-        <ScoreBadge score={avaliacao.score} tier={avaliacao.tier} />
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5">
+            {lead.status !== "novo" && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge[lead.status]}`}>
+                {statusLabel[lead.status]}
+              </span>
+            )}
+            <ScoreBadge score={avaliacao.score} tier={avaliacao.tier} />
+          </div>
+          {lead.portais.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-1">
+              {lead.portais.map((p) => (
+                <span
+                  key={p}
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${portalBadge(p)}`}
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Meta */}

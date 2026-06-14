@@ -19,7 +19,6 @@ export default function RadarShell({ leadsIniciais, facetas }: Props) {
   const [isPending, startTransition] = useTransition();
   const { cortes } = useCortes();
 
-  // Bairros disponíveis para a cidade selecionada (nunca derivado dos leads filtrados)
   const bairrosDisponiveis = useMemo(
     () => facetas.bairrosPorCidade[filtros.cidade ?? ""] ?? facetas.bairrosPorCidade[""],
     [facetas.bairrosPorCidade, filtros.cidade],
@@ -48,6 +47,8 @@ export default function RadarShell({ leadsIniciais, facetas }: Props) {
     add("tipo", novosFiltros.tipo);
     add("precoMin", novosFiltros.precoMin);
     add("precoMax", novosFiltros.precoMax);
+    for (const p of novosFiltros.portais ?? []) qs.append("portais", p);
+    for (const s of novosFiltros.statusFiltro ?? []) qs.append("statusFiltro", s);
 
     startTransition(async () => {
       try {
@@ -75,7 +76,7 @@ export default function RadarShell({ leadsIniciais, facetas }: Props) {
         onBuscar={onBuscar}
       />
 
-      <div className="flex items-center gap-2 text-sm text-zinc-500">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-500">
         <span>
           <strong className="font-semibold text-zinc-800 dark:text-zinc-200">
             {leadsExibidos.length}

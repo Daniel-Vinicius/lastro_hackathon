@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import type { FiltrosBusca, Lead, LeadComScore } from "./types";
 import { avaliarLead } from "./score";
 import { db, hasDb } from "./db/index";
-import { listings, priceObservations, properties } from "./db/schema";
+import { leadStatus, listings, priceObservations, properties } from "./db/schema";
 
 let cache: Promise<Lead[]> | null = null;
 
@@ -15,15 +15,21 @@ const norm = (s: string) =>
     .replace(/\p{Diacritic}/gu, "")
     .trim();
 
+/** Invalida o cache — chamado após gravar status para a próxima busca refletir. */
+export function invalidarCache(): void {
+  cache = null;
+}
+
 async function carregarDoDb(): Promise<Lead[]> {
   if (!db) return [];
 
   const now = new Date();
 
-  const [props, listingsRows, obsRows] = await Promise.all([
+  const [props, listingsRows, obsRows, statusRows] = await Promise.all([
     db.select().from(properties),
     db.select().from(listings),
     db.select().from(priceObservations),
+    db.select().from(leadStatus),
   ]);
 
   // Indexa listings e observações por property_id / listing_id
@@ -39,6 +45,11 @@ async function carregarDoDb(): Promise<Lead[]> {
     const arr = obsByListing.get(o.listingId) ?? [];
     arr.push(o);
     obsByListing.set(o.listingId, arr);
+  }
+
+  const statusByProperty = new Map<string, string>();
+  for (const s of statusRows) {
+    statusByProperty.set(s.propertyId, s.status);
   }
 
   const leads: Lead[] = [];
@@ -105,6 +116,7 @@ async function carregarDoDb(): Promise<Lead[]> {
       anuncioUrl: mainListing?.url ?? undefined,
       anunciantes,
       temContatoDireto: Boolean(particularListing),
+      status: (statusByProperty.get(prop.id) ?? "novo") as Lead["status"],
     });
   }
 
@@ -118,9 +130,9 @@ function carregarDoJson(): Lead[] {
     // Garante campos novos ausentes no JSON legado
     return raw.map((l) => ({
       ...l,
-      // Campos novos ausentes no JSON legado
       anunciantes: (l as { anunciantes?: string[] }).anunciantes ?? [],
       temContatoDireto: (l as { temContatoDireto?: boolean }).temContatoDireto ?? true,
+      status: (l as { status?: Lead["status"] }).status ?? "novo",
     }));
   } catch {
     return [];
@@ -147,6 +159,14 @@ export async function buscarLeads(filtros: FiltrosBusca = {}): Promise<LeadComSc
     if (filtros.tipo && l.tipo !== filtros.tipo) return false;
     if (filtros.precoMin != null && l.precoAtual < filtros.precoMin) return false;
     if (filtros.precoMax != null && l.precoAtual > filtros.precoMax) return false;
+    // Filtro por portal
+    if (filtros.portais?.length && !filtros.portais.some((p) => l.portais.includes(p)))
+      return false;
+    // Filtro por status (padrão: esconde descartado/vendido)
+    const statusAtivos: string[] = filtros.statusFiltro?.length
+      ? filtros.statusFiltro
+      : ["novo", "contatado", "negociando"];
+    if (!statusAtivos.includes(l.status)) return false;
     return true;
   });
 

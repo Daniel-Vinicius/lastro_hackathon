@@ -16,7 +16,7 @@ function validar(c: unknown): c is Cortes {
     isFinite(quente) &&
     morno >= 0 &&
     quente <= 100 &&
-    morno <= quente
+    morno < quente // quente sempre ao menos 1 acima de morno
   );
 }
 

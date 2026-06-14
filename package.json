@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "gen-data": "node scripts/gen-data.mjs",
     "db:push": "drizzle-kit push",
-    "db:seed": "tsx scripts/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:reset": "npx tsx scripts/reset-db.mjs",
+    "scrape:cnm": "npx tsx scripts/scrape-chavesnamao.mjs",
+    "scrape:spi": "npx tsx scripts/scrape-spimovel.mjs",
+    "ingest:olx": "npx tsx scripts/ingest-olx-mock.mjs",
+    "export:leads": "npx tsx scripts/export-leads.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

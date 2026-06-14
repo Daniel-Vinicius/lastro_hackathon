@@ -9,9 +9,9 @@ import { gapPreco, contarReducoes } from "./score";
 // abordar agora (ancorado nos sinais), sugere a alavanca, redige a 1ª mensagem
 // (LGPD-compliant) e antecipa a objeção.
 
-// Default: claude-opus-4-8 (mais capaz). Troque p/ claude-haiku-4-5 via env se
-// quiser respostas mais rápidas/baratas no demo.
-const MODELO = process.env.CLAUDE_MODEL || "claude-haiku-4-5";
+// Default: claude-sonnet-4-6 (boa qualidade/custo). Troque via CLAUDE_MODEL —
+// claude-opus-4-8 p/ máxima qualidade, claude-haiku-4-5 p/ rapidez/baixo custo.
+const MODELO = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
 
 const SISTEMA = `Você é um consultor sênior de captação de imóveis no Brasil, treinando corretores de uma imobiliária.
 

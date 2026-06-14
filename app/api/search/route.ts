@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
 
   const bairros = sp.getAll("bairros").filter(Boolean);
+  const portais = sp.getAll("portais").filter(Boolean);
+  const statusFiltro = sp.getAll("statusFiltro").filter(Boolean) as FiltrosBusca["statusFiltro"];
+
   const filtros: FiltrosBusca = {
     cidade: str(sp.get("cidade")),
     bairros: bairros.length ? bairros : undefined,
@@ -23,6 +26,8 @@ export async function GET(request: NextRequest) {
     tipo: str(sp.get("tipo")) as FiltrosBusca["tipo"],
     precoMin: num(sp.get("precoMin")),
     precoMax: num(sp.get("precoMax")),
+    portais: portais.length ? portais : undefined,
+    statusFiltro: statusFiltro?.length ? statusFiltro : undefined,
   };
 
   const leads = await buscarLeads(filtros);

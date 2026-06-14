@@ -48,14 +48,18 @@ export interface Lead {
   /** URLs de fotos (placeholder no sintético; foto real quando veio de scrape). */
   fotos: string[];
   /** Origem do dado: scrape real de um portal ou gerado sinteticamente. */
-  fonte: "sintetico" | "chavesnamao-real" | "spimovel-real";
+  fonte: "sintetico" | "chavesnamao-real" | "spimovel-real" | "olx-mock";
   /** URL do anúncio real (quando veio de scrape). */
   anuncioUrl?: string;
   /** Imobiliárias que anunciam o mesmo imóvel (Bloco G: pulverização cross-portal). */
   anunciantes: string[];
   /** Existe listing particular ativo — habilita o contato direto com o dono. */
   temContatoDireto: boolean;
+  /** Status do lead no funil do corretor (padrão "novo"). */
+  status: LeadStatus;
 }
+
+export type LeadStatus = "novo" | "contatado" | "negociando" | "descartado" | "vendido";
 
 /** Filtros que o corretor aplica na busca (Tela A). */
 export interface FiltrosBusca {
@@ -65,6 +69,10 @@ export interface FiltrosBusca {
   tipo?: TipoImovel;
   precoMin?: number;
   precoMax?: number;
+  /** Portais para filtrar (ex.: "OLX", "Chaves na Mão"). Vazio = todos. */
+  portais?: string[];
+  /** Status para mostrar. Vazio = padrão (novo + contatado + negociando). */
+  statusFiltro?: LeadStatus[];
 }
 
 export type Tier = "frio" | "morno" | "quente";

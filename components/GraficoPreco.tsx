@@ -1,9 +1,14 @@
+"use client";
+
+import { useState } from "react";
 import type { PontoPreco } from "@/lib/types";
 import { brl } from "@/lib/format";
 
 interface Props {
   historico: PontoPreco[];
   precoMercado: number;
+  area?: number;
+  bairro?: string;
 }
 
 const WIDTH = 600;
@@ -26,7 +31,9 @@ function fmtDataCurta(iso: string): string {
   return `${dd}/${mm}`;
 }
 
-export default function GraficoPreco({ historico, precoMercado }: Props) {
+export default function GraficoPreco({ historico, precoMercado, area, bairro }: Props) {
+  const [hover, setHover] = useState<number | null>(null);
+
   if (historico.length === 0) return null;
 
   const valores = historico.map((p) => p.valor);
@@ -61,11 +68,11 @@ export default function GraficoPreco({ historico, precoMercado }: Props) {
         )}
       </p>
 
+      <div className="relative" style={{ height: "140px" }}>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         preserveAspectRatio="none"
-        className="w-full"
-        style={{ height: "140px" }}
+        className="block w-full h-full"
         aria-hidden="true"
       >
         {/* Linha de mercado tracejada */}
@@ -103,16 +110,38 @@ export default function GraficoPreco({ historico, precoMercado }: Props) {
         {/* Pontos */}
         {pontos.map((p, i) => (
           <g key={i}>
+            {hover === i && (
+              <line
+                x1={p.x}
+                y1={PAD.top}
+                x2={p.x}
+                y2={HEIGHT - PAD.bottom}
+                stroke="currentColor"
+                strokeWidth="1"
+                strokeDasharray="3 3"
+                className="text-zinc-300 dark:text-zinc-600"
+              />
+            )}
             <circle
               cx={p.x}
               cy={p.y}
-              r="5"
+              r={hover === i ? "7" : "5"}
               className={
                 p.reducao
                   ? "fill-amber-400 stroke-amber-500"
                   : "fill-zinc-700 stroke-zinc-600 dark:fill-zinc-300 dark:stroke-zinc-400"
               }
               strokeWidth="1.5"
+            />
+            {/* Alvo de hover (transparente, maior que o ponto) */}
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r="16"
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
             />
           </g>
         ))}
@@ -142,6 +171,32 @@ export default function GraficoPreco({ historico, precoMercado }: Props) {
         )}
       </svg>
 
+      {/* Tooltip de preço no ponto sob o cursor */}
+      {hover !== null && (
+        <div
+          className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md border border-zinc-200 bg-white px-2 py-1 text-center shadow-md dark:border-zinc-700 dark:bg-zinc-800"
+          style={{
+            left: `${(pontos[hover].x / WIDTH) * 100}%`,
+            top: `${(pontos[hover].y / HEIGHT) * 100}%`,
+            marginTop: "-12px",
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            {brl(pontos[hover].valor)}
+          </div>
+          <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+            {fmtDataCurta(pontos[hover].data)}
+            {pontos[hover].reducao && (
+              <span className="ml-1 text-amber-600 dark:text-amber-400">
+                · redução
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      </div>
+
       {/* Legenda */}
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
         <span className="flex items-center gap-1.5">
@@ -159,6 +214,11 @@ export default function GraficoPreco({ historico, precoMercado }: Props) {
           </span>
         )}
       </div>
+      {area && precoMercado > 0 && (
+        <p className="mt-1 text-xs italic text-zinc-400 dark:text-zinc-500">
+          Estimativa de mercado: ~{Math.round(precoMercado / area).toLocaleString("pt-BR")} R$/m² × {area} m² — mediana R$/m² do lote raspado
+        </p>
+      )}
     </div>
   );
 }

@@ -60,10 +60,7 @@ export function avaliarLead(lead: Lead): ResultadoScore {
       rotulo: "Tempo no anúncio",
       pontos: Math.round(fDias * PESOS.dias),
       maximo: PESOS.dias,
-      detalhe:
-        lead.diasNoAnuncio >= 90
-          ? `Anunciado há ${lead.diasNoAnuncio} dias — acima de 90, sinal forte de cansaço (visitas caem ~50% em 4 semanas).`
-          : `Anunciado há ${lead.diasNoAnuncio} dias.`,
+      detalhe: `Anunciado há ${lead.diasNoAnuncio} dias${lead.diasNoAnuncio >= 90 ? " — acima de 90 dias." : "."}`,
       intensidade: intensidade(fDias),
     },
     {
@@ -72,11 +69,9 @@ export function avaliarLead(lead: Lead): ResultadoScore {
       pontos: Math.round(fReducoes * PESOS.reducoes),
       maximo: PESOS.reducoes,
       detalhe:
-        reducoes >= 2
-          ? `Já baixou o preço ${reducoes}x — proprietário motivado e flexível.`
-          : reducoes === 1
-            ? "Baixou o preço 1x."
-            : "Nunca reajustou o preço.",
+        reducoes >= 1
+          ? `Baixou o preço ${reducoes}x.`
+          : "Sem reduções de preço.",
       intensidade: intensidade(fReducoes),
     },
     {
@@ -86,10 +81,10 @@ export function avaliarLead(lead: Lead): ResultadoScore {
       maximo: PESOS.gap,
       detalhe:
         gap > 0.03
-          ? `Anunciado ${Math.round(gap * 100)}% acima do mercado da região — superprecificação que trava a venda.`
+          ? `Anunciado ${Math.round(gap * 100)}% acima do estimado de mercado.`
           : gap < -0.03
-            ? `Anunciado ${Math.round(Math.abs(gap) * 100)}% abaixo do mercado — pode fechar rápido.`
-            : "Alinhado com o preço de mercado da região.",
+            ? `Anunciado ${Math.round(Math.abs(gap) * 100)}% abaixo do estimado de mercado.`
+            : "Alinhado com o estimado de mercado.",
       intensidade: intensidade(fGap),
     },
     {
@@ -97,10 +92,7 @@ export function avaliarLead(lead: Lead): ResultadoScore {
       rotulo: "Pulverização",
       pontos: Math.round(fPulv * PESOS.pulverizacao),
       maximo: PESOS.pulverizacao,
-      detalhe:
-        nPortais >= 3
-          ? `Anunciado em ${nPortais} portais ao mesmo tempo — sem exclusividade, aberto a ajuda.`
-          : `Anunciado em ${nPortais} portal${nPortais > 1 ? "is" : ""}.`,
+      detalhe: `Anunciado em ${nPortais} ${nPortais > 1 ? "portais" : "portal"}.`,
       intensidade: intensidade(fPulv),
     },
   ];

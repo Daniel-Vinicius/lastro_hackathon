@@ -23,12 +23,20 @@ export default function CriteriosPanel({ scores }: Props) {
 
   const total = scores.length || 1;
 
+  // Valor exibido/controlado pelos sliders — usa o padrão até hidratar para
+  // não dar mismatch de hidratação.
+  const c = hidratado ? cortes : CORTES_PADRAO;
+
   function handleMorno(v: number) {
-    setCortes({ morno: Math.min(v, cortes.quente), quente: cortes.quente });
+    // Morno fica sempre ao menos 1 abaixo de Quente.
+    const morno = Math.max(0, Math.min(v, cortes.quente - 1));
+    setCortes({ morno, quente: cortes.quente });
   }
 
   function handleQuente(v: number) {
-    setCortes({ morno: cortes.morno, quente: Math.max(v, cortes.morno) });
+    // Quente fica sempre ao menos 1 acima de Morno.
+    const quente = Math.min(100, Math.max(v, cortes.morno + 1));
+    setCortes({ morno: cortes.morno, quente });
   }
 
   return (
@@ -48,20 +56,20 @@ export default function CriteriosPanel({ scores }: Props) {
               Corte Frio → Morno
             </label>
             <span className="tabular-nums text-sm font-semibold text-amber-600 dark:text-amber-400">
-              {hidratado ? cortes.morno : CORTES_PADRAO.morno}
+              {c.morno}
             </span>
           </div>
           <input
             type="range"
             min={0}
-            max={100}
-            value={hidratado ? cortes.morno : CORTES_PADRAO.morno}
+            max={c.quente - 1}
+            value={c.morno}
             onChange={(e) => handleMorno(Number(e.target.value))}
             className="w-full accent-amber-500"
           />
           <div className="mt-1 flex justify-between text-xs text-zinc-400">
             <span>0</span>
-            <span>100</span>
+            <span>{c.quente - 1}</span>
           </div>
         </div>
 
@@ -72,19 +80,19 @@ export default function CriteriosPanel({ scores }: Props) {
               Corte Morno → Quente
             </label>
             <span className="tabular-nums text-sm font-semibold text-red-600 dark:text-red-400">
-              {hidratado ? cortes.quente : CORTES_PADRAO.quente}
+              {c.quente}
             </span>
           </div>
           <input
             type="range"
-            min={0}
+            min={c.morno + 1}
             max={100}
-            value={hidratado ? cortes.quente : CORTES_PADRAO.quente}
+            value={c.quente}
             onChange={(e) => handleQuente(Number(e.target.value))}
             className="w-full accent-red-500"
           />
           <div className="mt-1 flex justify-between text-xs text-zinc-400">
-            <span>0</span>
+            <span>{c.morno + 1}</span>
             <span>100</span>
           </div>
         </div>

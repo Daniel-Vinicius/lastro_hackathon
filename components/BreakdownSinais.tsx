@@ -1,6 +1,6 @@
 import type { ResultadoScore } from "@/lib/types";
 import { intensidadeBar } from "@/lib/format";
-import ScoreBadge from "./ScoreBadge";
+import ScoreBadgeReativo from "./ScoreBadgeReativo";
 
 interface Props {
   avaliacao: ResultadoScore;
@@ -13,7 +13,7 @@ export default function BreakdownSinais({ avaliacao }: Props) {
         <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Score de captabilidade
         </p>
-        <ScoreBadge score={avaliacao.score} tier={avaliacao.tier} />
+        <ScoreBadgeReativo score={avaliacao.score} />
       </div>
 
       <ol className="flex flex-col gap-4">
