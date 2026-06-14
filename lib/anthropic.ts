@@ -11,7 +11,7 @@ import { gapPreco, contarReducoes } from "./score";
 
 // Default: claude-opus-4-8 (mais capaz). Troque p/ claude-haiku-4-5 via env se
 // quiser respostas mais rápidas/baratas no demo.
-const MODELO = process.env.CLAUDE_MODEL || "claude-opus-4-8";
+const MODELO = process.env.CLAUDE_MODEL || "claude-haiku-4-5";
 
 const SISTEMA = `Você é um consultor sênior de captação de imóveis no Brasil, treinando corretores de uma imobiliária.
 

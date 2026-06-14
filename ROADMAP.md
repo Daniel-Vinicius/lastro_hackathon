@@ -1,9 +1,8 @@
 # Radar de Captação — Roadmap
 
-> **Como usar este arquivo:** cada **Fase** abaixo é autocontida. Em uma sessão
-> nova do Claude Code: peça o **Plan (Opus)** apontando a fase, depois **execute
-> (Sonnet)**. Leia primeiro as seções _Visão_, _Decisões travadas_ e _Estado
-> atual_ — elas dão o contexto que toda fase assume.
+> **Como usar este arquivo:** o núcleo (Fases 1–4) está **pronto**. O que resta é
+> a **sessão de incrementos de hoje** (blocos A–E, orçados em horas). Leia _Visão_,
+> _Decisões travadas_ e _Estado atual_ antes de mexer em qualquer coisa.
 
 ---
 
@@ -24,8 +23,7 @@ Radar te dá uma fila priorizada — 'esses são os mais quentes essa semana, e 
 quê' — e a IA já escreve a abordagem ancorada em dado."_
 
 **Diferencial:** não é lista plana (Captei) — é **fila priorizada + explicável +
-pitch ancorado em dado**. Para a Lastro, é a evolução natural da Lais (que hoje
-só "registra a captação pro time concluir").
+pitch ancorado em dado**.
 
 ---
 
@@ -37,34 +35,38 @@ só "registra a captação pro time concluir").
 | Usuário/pagante | Imobiliária/corretor |
 | IA | **Claude real** (briefing pro corretor); resto **mockado** |
 | IA NÃO faz | Conversar com o dono; CRM/Kanban — ficam como "extra/futuro" |
-| Stack | **Next.js full-stack** (App Router, TS) + Tailwind v4 |
+| Stack | **Next.js 16.2.9 full-stack** (App Router, TS) + Tailwind v4 |
 | Modelo | `claude-opus-4-8` (default; configurável via env `CLAUDE_MODEL`) |
 | Saída estruturada | `messages.parse()` + `zodOutputFormat` |
-| Dados | **Scrape-once OLX → cache JSON** + enrich; fallback sintético; **nunca** scrape ao vivo no demo |
+| Score | **Determinístico em `lib/score.ts`** — nunca sai do LLM (estabilidade no demo) |
+| **Alvo de scrape** | **Chaves na Mão** (único que passou em `fetch` simples). OLX/Viva Real/ZAP bloqueiam (403 + captcha) → descartados |
+| Dados | **Scrape-once → funde no cache JSON** + enriquece; base sintética sempre presente; **nunca** scrape ao vivo no demo |
 | Core inegociável | Lista com score (Tela A) + Ficha com IA "por que abordar" (Tela B) |
 
 ---
 
-## Estado atual (✅ já feito — NÃO refazer)
+## Estado atual (✅ feito — NÃO refazer)
 
-- Projeto **Next.js 16.2.9 + React 19 + Tailwind v4 + TS** scaffoldado na raiz.
-- Deps instaladas: `@anthropic-ai/sdk`, `cheerio`, `zod`.
-- Camada `lib/` escrita (lógica de negócio, testada só por inspeção):
-  - **`lib/types.ts`** — tipos do domínio (ver _Contratos_ abaixo).
-  - **`lib/score.ts`** — `avaliarLead(lead): ResultadoScore` (score determinístico
-    explicável) + `contarReducoes(lead)`, `gapPreco(lead)`.
-  - **`lib/data.ts`** — `buscarLeads(filtros): LeadComScore[]`,
-    `buscarLeadPorId(id): LeadComScore | null`, `facetas()`. Lê
-    `data/leads.json` e filtra ao vivo.
-  - **`lib/anthropic.ts`** — `gerarBriefing(lead): Promise<{briefing, fonte}>`
-    (Claude via parse+zod, com fallback determinístico se faltar API key).
+- Projeto **Next.js 16.2.9 + React 19 + Tailwind v4 + TS** + deps (`@anthropic-ai/sdk`, `cheerio`, `zod`).
+- **`lib/`** completo: `types.ts`, `score.ts` (`avaliarLead` + `contarReducoes`/`gapPreco`),
+  `data.ts` (`buscarLeads`/`buscarLeadPorId`/`facetas`), `anthropic.ts`
+  (`gerarBriefing` com fallback), `format.ts` (helpers de UI).
+- **`scripts/gen-data.mjs`** → gera **40 leads** sintéticos calibrados (4 heróis +
+  perfis quente/morno/frio, venda+aluguel). `data/leads.json` populado.
+- **API** (`app/api/`): `GET /search`, `GET /lead/[id]`, `POST /briefing` (runtime nodejs).
+- **Tela A** (`app/page.tsx` + `RadarShell`/`FiltroForm`/`ListaLeads`/`LeadCard`/`ScoreBadge`):
+  filtros + fila priorizada + barra de métricas ("X leads · Y quentes").
+- **Tela B** (`app/lead/[id]`): dados + fotos + gráfico SVG de preço (`GraficoPreco`)
+  + breakdown de sinais (`BreakdownSinais`) + briefing IA com copiar (`BriefingPanel`).
+- **O app roda end-to-end** com dado sintético + IA (real se houver `.env.local`,
+  senão fallback determinístico — não quebra).
 
-**Ainda NÃO existe:** `data/leads.json`, API routes, telas, scraper, `.env.local`.
-**O app ainda não roda end-to-end** (falta dado + API + UI).
+**Ainda NÃO existe:** `.env.local` (briefing roda no fallback até criar), scraper
+real, cache de briefing, página de critérios, botão WhatsApp.
 
 ---
 
-## Contratos (a interface que as fases consomem — fonte da verdade: `lib/types.ts`)
+## Contratos (fonte da verdade: `lib/types.ts`)
 
 ```ts
 Lead {
@@ -75,7 +77,7 @@ Lead {
   precoAtual; historicoPreco: {data,valor}[]; diasNoAnuncio;
   portais: string[]; anunciante: "particular";
   precoEstimadoMercado; fotos: string[];
-  fonte: "olx-real"|"sintetico"; anuncioUrl?;
+  fonte: "sintetico"|"chavesnamao-real"; anuncioUrl?;   // ← união estendida no bloco C
 }
 ResultadoScore { score:0-100; tier:"frio"|"morno"|"quente"; sinais:SinalScore[]; principaisRazoes:string[] }
 LeadComScore = Lead & { avaliacao: ResultadoScore }
@@ -83,129 +85,108 @@ BriefingCaptacao { porQueAgora; comoAbordar; mensagemSugerida; objecaoProvavel }
 FiltrosBusca { cidade?; bairro?; transacao?; tipo?; precoMin?; precoMax? }
 ```
 
-> `data/leads.json` = **`Lead[]`** (sem `avaliacao` — o score é calculado em
-> tempo de leitura por `avaliarLead`).
+> `data/leads.json` = **`Lead[]`** (sem `avaliacao` — score calculado em tempo de
+> leitura por `avaliarLead`). Tiers: `quente` ≥66, `morno` ≥40, senão `frio`.
 
 ---
 
-# FASES
+## 🔎 Análise de scraping (sondagem real — `fetch` simples, hoje)
 
-## Fase 1 — Camada de dados (base realista) 🟢 base de tudo
-**Objetivo:** existir `data/leads.json` realista para o app ter o que mostrar.
+| Portal | Resposta | O que volta | Veredito |
+|---|---|---|---|
+| **Chaves na Mão** | HTTP 200 (1 MB) | HTML completo + **8 blocos `application/ld+json`**, ~15 anúncios/página | ✅ **Alvo** |
+| OLX | HTTP 403 + captcha | desafio anti-bot | ❌ precisaria headless/proxy |
+| Viva Real / ZAP | HTTP 403 + captcha | DataDome | ❌ pior ainda |
 
-**Construir:**
-- `scripts/gen-data.mjs` (Node ESM puro, rodável com `node scripts/gen-data.mjs`)
-  que gera **30–50 leads** sintéticos mas **calibrados em dados BR reais** e
-  grava em `data/leads.json` conforme o contrato `Lead[]`.
-- Calibragem: bairros reais (ex.: SP — Moema, Vila Mariana, Pinheiros, Tatuapé,
-  Santana, Itaim); preço/m² plausível por bairro; `historicoPreco` coerente com
-  `diasNoAnuncio` e com as reduções; ~54% dos de venda **acima** do mercado;
-  alguns com >90 dias e ≥2 reduções (sinais fortes).
-- Curar **3–4 "leads-herói"** com história forte (parado há muito + 2 reduções +
-  acima do mercado + vários portais) → score alto, ótimos pro demo.
-- `proprietario`/`telefone` fake; `fotos` = placeholders (ex.: picsum/unsplash).
+**Campos por origem** (mapeados de um anúncio real do Chaves na Mão):
 
-**Pronto quando:** `node scripts/gen-data.mjs` gera `data/leads.json` válido e
-`buscarLeads()` retorna leads ordenados por score sem erro.
+- **Real (do scrape):** bairro, cidade, uf, tipo, área, quartos, **precoAtual**,
+  **fotos (URL real)**, **anuncioUrl**, lat/long, descrição.
+- **Derivável do lote raspado:** `precoEstimadoMercado` = mediana de R$/m² por bairro.
+- **Construído/enriquecido (sintético):** `historicoPreco` ⚠️ (nenhum snapshot
+  expõe), `diasNoAnuncio`, reduções, `portais` (pulverização), `anunciante`
+  (Chaves na Mão é majoritariamente imobiliária → classificação enriquecida),
+  `proprietario`, `telefone` (fake por LGPD).
 
-**Mockar:** tudo (dado sintético). O scrape real é a Fase 5.
+> **Por que o histórico é sempre construído:** dias-no-anúncio (30) + reduções (25)
+> = **55 dos 100 pontos** do score vêm de séries temporais que _nenhum_ scrape de
+> snapshot único tem. O scrape entrega a **camada tangível real** (foto + preço +
+> bairro + link); os sinais temporais são enriquecidos — independente do portal.
 
----
-
-## Fase 2 — API routes (back) 🟢
-**Objetivo:** expor a lógica `lib/` via HTTP pro front consumir.
-
-**Construir (App Router, em `app/api/`):**
-- `GET /api/search` — lê filtros da query string (`cidade,bairro,transacao,tipo,
-  precoMin,precoMax`), chama `buscarLeads(filtros)`, devolve `LeadComScore[]`.
-  Inclua também as `facetas()` (cidades/bairros) pra alimentar os selects.
-- `GET /api/lead/[id]` — `buscarLeadPorId(id)` → `LeadComScore | null` (404 se nulo).
-- `POST /api/briefing` — body `{ id }` → `buscarLeadPorId` + `gerarBriefing(lead)`
-  → `{ briefing, fonte }`. **Runtime `nodejs`** (usa `fs` e o SDK — não Edge).
-
-**Pronto quando:** as 3 rotas respondem JSON correto via `curl`/navegador.
-
-**Atenção:** rotas que tocam `fs`/SDK precisam de `export const runtime = "nodejs"`.
+**Tensão FSBO assumida:** o OLX é _o_ portal de particular (e é o bloqueado); o
+Chaves na Mão é raspável mas é quase tudo imobiliária. Solução **híbrida honesta**:
+heróis sintéticos seguem como núcleo da narrativa do score; alguns leads reais do
+Chaves na Mão entram com foto/link reais (badge "dado real") provando o pipeline.
 
 ---
 
-## Fase 3 — Tela A: Radar (busca + lista) 🟢 core
-**Objetivo:** a tela principal — filtros + fila priorizada de leads.
+# SESSÃO DE HOJE — incrementos (15h → 20h úteis; 20–21h reserva de entrega)
 
-**Construir (`app/page.tsx` + componentes):**
-- Formulário de filtros: cidade, bairro, transação (venda/aluguel), tipo, faixa
-  de preço. Ao submeter, chama `/api/search`.
-- Lista de **cards de lead** ordenados por score, cada um com: bairro/tipo/área,
-  preço, **badge de score + tier** (frio/morno/quente com cor), e os
-  `principaisRazoes` (2–3 bullets). Card clicável → vai pra Tela B (`/lead/[id]`).
-- Visual de "radar/painel": deixar claro que é fila inteligente, não lista burra.
+> Ordem confirmada: **A → B → C → D → E**. Ganhos baratos primeiro (bancam melhoria
+> mesmo se tudo falhar), scraper com **time-box rígido** (sintético é a rede),
+> críterios e polish de baixo risco. Se o scraper estourar 2h: **corta** — o app
+> segue redondo.
 
-**Pronto quando:** dá pra filtrar, ver a fila ordenada por captabilidade, e
-clicar num lead pra abrir a ficha.
+## Bloco A — Botão WhatsApp + quick wins de UI · ~0:30 · risco 0
+**Objetivo:** fechar o loop visível da abordagem.
+- `BriefingPanel` recebe `telefone` como prop (vindo da ficha) e ganha botão
+  **"Chamar no WhatsApp"** ao lado do "Copiar": deeplink
+  `https://wa.me/55<digitos>?text=<mensagemSugerida codificada>`.
+- Pequenos ajustes visuais de leitura.
 
-**Mockar:** nada novo — consome a API da Fase 2.
+**Pronto quando:** clicar abre o WhatsApp com a mensagem sugerida já preenchida.
 
----
+## Bloco B — Cache do briefing · ~0:30 · risco baixo
+**Objetivo:** não regerar o briefing (e não gastar API) a cada visita à ficha.
+- `Map` module-level em `lib/anthropic.ts` chaveado por `lead.id` (lead é estático).
+  `gerarBriefing` consulta/grava o cache antes de chamar o Claude.
+- (Opcional) persistir em `data/.briefing-cache.json` p/ sobreviver a restart.
 
-## Fase 4 — Tela B: Ficha do lead (com IA) 🟢 core
-**Objetivo:** a ficha que mostra a inteligência + o briefing da IA.
+**Pronto quando:** 2ª visita à mesma ficha volta instantânea, sem nova chamada.
 
-**Construir (`app/lead/[id]/page.tsx` + componentes):**
-- Dados do imóvel + proprietário (com aviso de que contato é mockado).
-- **Gráfico de histórico de preço** — SVG/sparkline **na mão** (zero dependência
-  de chart), marcando as reduções.
-- **Breakdown dos sinais** (`avaliacao.sinais`): barra por sinal (pontos/máximo) +
-  `detalhe` + intensidade.
-- **Briefing da IA** (chama `POST /api/briefing`): `porQueAgora`, `comoAbordar`,
-  **`mensagemSugerida`** (com botão "copiar"), `objecaoProvavel`. Mostrar estado
-  de loading. Badge discreto quando `fonte === "fallback"` (sem API key).
+## Bloco C — Scraper Chaves na Mão · ~2:00 **(TIME-BOX)** · risco médio
+**Objetivo:** trocar parte do dado por anúncios reais (foto + link reais).
+- `scripts/scrape-chavesnamao.mjs` (Node ESM + `fetch`, `cheerio` se preciso):
+  raspa 1–2 páginas de busca, parseia os blocos `application/ld+json`, extrai os
+  campos reais, **enriquece** o resto espelhando a lógica de `gen-data.mjs`
+  (`buildHistorico`, dimensões), calcula `precoEstimadoMercado` pela mediana do
+  lote, marca `fonte: "chavesnamao-real"` + `anuncioUrl` + `fotos` reais.
+- **Funde** em `data/leads.json` de forma idempotente (remove `chavesnamao-real`
+  anteriores, mantém sintéticos, reanexa). Isso É o "fluxo de carga" — sem UI de
+  import (import ao vivo é proibido pela decisão travada).
+- Estender união `fonte` em `lib/types.ts`.
+- **Fallback:** se vier 403/captcha, logar e sair sem tocar no JSON existente.
 
-**Pronto quando:** abrir um lead mostra gráfico + sinais + briefing real do Claude,
-e dá pra copiar a mensagem de abordagem.
+**Pronto quando:** rodar o script enche o cache com leads reais; se falhar, o app
+segue com o sintético.
 
-**Pré-requisito de ambiente:** criar `.env.local` com `ANTHROPIC_API_KEY=...`
-(sem isso, o briefing usa o fallback determinístico — o app não quebra).
+## Bloco D — Página de critérios · ~1:00 · risco baixo
+**Objetivo:** transparência + controle do score (explicabilidade ao vivo).
+- Rota `app/criterios/page.tsx`: mostra os **4 sinais e pesos read-only**
+  (dias 30 · reduções 25 · gap 25 · pulverização 20) com explicação.
+- **Cortes quente/morno/frio editáveis** (sliders) com **preview de distribuição
+  ao vivo** — re-classifica 100% no client a partir do `score` numérico que cada
+  lead já traz. Persiste em `localStorage`.
+- Radar (`RadarShell`) lê os cortes do `localStorage` e **re-buckets** a lista
+  (cor do tier + contagem de quentes). Link "Critérios" no cabeçalho do Radar.
+- Pesos **read-only** (editar peso exigiria recompute no servidor — fora de escopo).
 
----
+**Pronto quando:** arrastar os cortes reordena/recolore os tiers na hora.
 
-## Fase 5 — Scraper OLX scrape-once (upgrade pra dado real) 🟡 opcional/arriscado
-**Objetivo:** trocar (parte do) dado sintético por anúncios FSBO **reais** do OLX.
+## Bloco E — Polish + pitch · ~0:45 · risco baixo
+- Badge **"dado real"** + "Ver anúncio original ↗" nos leads `chavesnamao-real`.
+- Selo/nota **LGPD** visível na ficha (mensagem cita anúncio público + saída fácil).
+- `README` atualizado (rodar, `.env.local`, `gen-data`, `scrape-chavesnamao`).
+- Ensaio do fluxo: Radar → filtra → herói → ficha → briefing → WhatsApp; e
+  Critérios → arrasta corte → fila reordena.
 
-**Construir:**
-- `scripts/scrape-olx.mjs` (Node ESM + `cheerio`/`fetch`) que raspa **uma vez**
-  resultados de busca do OLX p/ 1–2 regiões, extrai os campos do contrato `Lead`
-  que der (bairro, preço, área, tipo, URL), marca `fonte: "olx-real"`, e
-  **enriquece** o que não vem do anúncio (`historicoPreco`, `diasNoAnuncio`,
-  reduções) calibrado nos benchmarks. Grava/funde em `data/leads.json`.
-- **Fallback:** se o OLX bloquear (anti-bot/CAPTCHA), manter o sintético da Fase 1.
-  O demo **nunca** depende do scrape ao vivo.
-
-**Pronto quando:** rodar o script enche o cache com alguns leads reais; se falhar,
-o app segue funcionando com o sintético.
-
-**Risco conhecido:** OLX tem anti-bot; ZAP/Viva Real (DataDome) são piores —
-focar no OLX. Não colocar scrape no caminho do demo.
-
----
-
-## Fase 6 — Polish + pitch 🟢
-**Objetivo:** deixar redondo pra apresentar.
-
-**Construir:**
-- **Selo/aviso LGPD** na Tela B: a `mensagemSugerida` identifica origem (anúncio
-  público) + saída fácil ("é só ignorar"). Deixar isso visível como feature.
-- Barra de métricas opcional no topo do Radar ("X encontrados · Y quentes").
-- Ajuste visual, curar os leads-herói pro fluxo de demo ficar liso.
-- `README.md`: como rodar (`npm run dev`), onde pôr a `ANTHROPIC_API_KEY`, como
-  regenerar dados (`node scripts/gen-data.mjs`).
-- Ensaio do fluxo: Radar → filtra → lead-herói → ficha → briefing → copiar msg.
-
-**Pronto quando:** o fluxo de 3 min roda sem tropeço e o README explica o setup.
+**Pronto quando:** o fluxo de 3 min roda sem tropeço.
 
 ---
 
-## Ordem sugerida
-**1 → 2 → 3 → 4** é o caminho crítico (app funcionando end-to-end com dado
-sintético + IA real). **5** é upgrade opcional de realismo. **6** é o acabamento.
-Se o tempo apertar, corte a Fase 5 e o que for "opcional" na 6 — o núcleo
-(1–4 + selo LGPD) é o que vende.
+## Verificação (após cada bloco e no fim)
+`npx tsc --noEmit` (strict) · `npm run lint` · `npm run build` · fluxo manual.
+
+## Se o tempo apertar
+Corte na ordem: **C** (scraper — sintético cobre) → preview ao vivo do **D** →
+opcionais do **E**. Núcleo + A + B + cortes editáveis é o que vende.
