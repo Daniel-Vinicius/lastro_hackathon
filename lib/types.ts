@@ -45,10 +45,10 @@ export interface Lead {
   anunciante: "particular";
   /** Preço estimado de mercado p/ a região (R$) — base do gap de preço. */
   precoEstimadoMercado: number;
-  /** URLs de fotos (placeholder no protótipo). */
+  /** URLs de fotos (placeholder no sintético; foto real quando veio de scrape). */
   fotos: string[];
-  /** Origem do dado: scrape real do OLX ou gerado sinteticamente. */
-  fonte: "olx-real" | "sintetico";
+  /** Origem do dado: scrape real de um portal ou gerado sinteticamente. */
+  fonte: "sintetico" | "chavesnamao-real" | "spimovel-real";
   /** URL do anúncio real (quando veio de scrape). */
   anuncioUrl?: string;
 }
@@ -64,6 +64,14 @@ export interface FiltrosBusca {
 }
 
 export type Tier = "frio" | "morno" | "quente";
+
+/** Cortes do score que definem as fronteiras entre tiers. */
+export interface Cortes {
+  /** Score mínimo para tier "morno" (padrão 40). */
+  morno: number;
+  /** Score mínimo para tier "quente" (padrão 66). */
+  quente: number;
+}
 
 export interface SinalScore {
   chave: "dias" | "reducoes" | "gap" | "pulverizacao";

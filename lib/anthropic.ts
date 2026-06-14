@@ -22,7 +22,8 @@ Seu trabalho é municiar o corretor para a abordagem. Use SEMPRE os dados do lea
 Regras de escrita:
 - Português brasileiro, tom profissional e direto. Sem floreio, sem emoji nos campos de análise.
 - A "mensagemSugerida" é o que o CORRETOR manda no WhatsApp do dono. Deve ser curta (2–4 frases), cordial, e COMPLIANT com a LGPD: identificar que viu o anúncio público do imóvel, dizer o propósito, e oferecer saída fácil ("se não fizer sentido, é só ignorar"). Ofereça valor (ajudar a vender mais rápido / no preço certo), não pressione.
-- Seja específico e curto em cada campo.`;
+- Seja específico e curto em cada campo.
+- NUNCA peça o WhatsApp do proprietário na "mensagemSugerida" — a mensagem JÁ está sendo enviada pelo WhatsApp para o número dele. Perguntar "Qual seu WhatsApp?" é contraditório e soa mal.`;
 
 const BriefingSchema = z.object({
   porQueAgora: z
@@ -46,6 +47,12 @@ const BriefingSchema = z.object({
       "A objeção mais provável do dono (ex.: 'quero economizar a comissão') + como o corretor contorna em 1 frase.",
     ),
 });
+
+// Lead é estático → briefing pode ser cacheado por id (evita regerar e gastar API).
+const cacheBriefing = new Map<
+  string,
+  { briefing: BriefingCaptacao; fonte: "claude" | "fallback" }
+>();
 
 function resumoLead(lead: LeadComScore): string {
   const gap = Math.round(gapPreco(lead) * 100);
@@ -85,8 +92,13 @@ function briefingFallback(lead: LeadComScore): BriefingCaptacao {
 export async function gerarBriefing(
   lead: LeadComScore,
 ): Promise<{ briefing: BriefingCaptacao; fonte: "claude" | "fallback" }> {
+  const emCache = cacheBriefing.get(lead.id);
+  if (emCache) return emCache;
+
   if (!process.env.ANTHROPIC_API_KEY) {
-    return { briefing: briefingFallback(lead), fonte: "fallback" };
+    const resultado = { briefing: briefingFallback(lead), fonte: "fallback" as const };
+    cacheBriefing.set(lead.id, resultado);
+    return resultado;
   }
 
   try {
@@ -106,7 +118,9 @@ export async function gerarBriefing(
 
     const parsed = response.parsed_output;
     if (!parsed) return { briefing: briefingFallback(lead), fonte: "fallback" };
-    return { briefing: parsed, fonte: "claude" };
+    const resultado = { briefing: parsed, fonte: "claude" as const };
+    cacheBriefing.set(lead.id, resultado);
+    return resultado;
   } catch (err) {
     console.error("[briefing] erro ao chamar Claude, usando fallback:", err);
     return { briefing: briefingFallback(lead), fonte: "fallback" };

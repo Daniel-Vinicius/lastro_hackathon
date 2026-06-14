@@ -39,7 +39,7 @@ pitch ancorado em dado**.
 | Modelo | `claude-opus-4-8` (default; configurável via env `CLAUDE_MODEL`) |
 | Saída estruturada | `messages.parse()` + `zodOutputFormat` |
 | Score | **Determinístico em `lib/score.ts`** — nunca sai do LLM (estabilidade no demo) |
-| **Alvo de scrape** | **Chaves na Mão** (único que passou em `fetch` simples). OLX/Viva Real/ZAP bloqueiam (403 + captcha) → descartados |
+| **Alvo de scrape** | Primário **Chaves na Mão**, secundário **SP Imóvel** (passaram em `fetch` simples). OLX/Viva Real/ZAP/ImovelWeb bloqueiam (403 + captcha/Cloudflare/DataDome) → descartados |
 | Dados | **Scrape-once → funde no cache JSON** + enriquece; base sintética sempre presente; **nunca** scrape ao vivo no demo |
 | Core inegociável | Lista com score (Tela A) + Ficha com IA "por que abordar" (Tela B) |
 
@@ -94,9 +94,11 @@ FiltrosBusca { cidade?; bairro?; transacao?; tipo?; precoMin?; precoMax? }
 
 | Portal | Resposta | O que volta | Veredito |
 |---|---|---|---|
-| **Chaves na Mão** | HTTP 200 (1 MB) | HTML completo + **8 blocos `application/ld+json`**, ~15 anúncios/página | ✅ **Alvo** |
+| **Chaves na Mão** | HTTP 200 (1 MB) | HTML + **8 blocos `application/ld+json`** com `Apartment`/`Offer` completos (~15 anúncios/página): preço, área, endereço, foto, geo já estruturados | ✅ **Alvo primário** (menos parsing) |
+| **SP Imóvel** | HTTP 200 (584 KB) | server-rendered; `ItemList` ld+json (23 anúncios) + slug super-estruturado (tipo/transação/quartos/vagas/área/bairro/id). **Preço/foto** só no card HTML. **SP-only** (casa com a calibração) | ✅ **Secundário/fallback** |
 | OLX | HTTP 403 + captcha | desafio anti-bot | ❌ precisaria headless/proxy |
 | Viva Real / ZAP | HTTP 403 + captcha | DataDome | ❌ pior ainda |
+| ImovelWeb | HTTP 403 + Cloudflare | desafio Cloudflare (grupo Navent) | ❌ precisaria headless/proxy |
 
 **Campos por origem** (mapeados de um anúncio real do Chaves na Mão):
 
@@ -154,8 +156,11 @@ Chaves na Mão entram com foto/link reais (badge "dado real") provando o pipelin
 - **Funde** em `data/leads.json` de forma idempotente (remove `chavesnamao-real`
   anteriores, mantém sintéticos, reanexa). Isso É o "fluxo de carga" — sem UI de
   import (import ao vivo é proibido pela decisão travada).
-- Estender união `fonte` em `lib/types.ts`.
-- **Fallback:** se vier 403/captcha, logar e sair sem tocar no JSON existente.
+- Estender união `fonte` em `lib/types.ts` (`"chavesnamao-real"`, e `"spimovel-real"` se entrar o secundário).
+- **Secundário (se sobrar tempo / se o primário render pouco):** `scripts/scrape-spimovel.mjs`
+  — parseia o `ItemList` ld+json + slug (tipo/quartos/vagas/área/bairro) e puxa
+  preço/foto do card HTML. SP-only, casa com a calibração de R$/m².
+- **Fallback:** se vier 403/captcha/Cloudflare, logar e sair sem tocar no JSON existente.
 
 **Pronto quando:** rodar o script enche o cache com leads reais; se falhar, o app
 segue com o sintético.

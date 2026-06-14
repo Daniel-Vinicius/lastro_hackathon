@@ -43,3 +43,12 @@ export const intensidadeBar: Record<SinalScore["intensidade"], string> = {
   medio: "bg-amber-400",
   baixo: "bg-zinc-300 dark:bg-zinc-600",
 };
+
+// Monta deeplink WhatsApp com prefixo BR. Retorna "" se não houver dígitos.
+// texto é opcional: se omitido/vazio abre o chat sem mensagem pré-preenchida.
+export function linkWhatsApp(telefone: string, texto?: string): string {
+  const digitos = telefone.replace(/\D/g, "");
+  if (!digitos) return "";
+  const base = `https://wa.me/55${digitos}`;
+  return texto ? `${base}?text=${encodeURIComponent(texto)}` : base;
+}
