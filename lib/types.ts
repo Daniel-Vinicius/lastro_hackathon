@@ -56,7 +56,7 @@ export interface Lead {
 /** Filtros que o corretor aplica na busca (Tela A). */
 export interface FiltrosBusca {
   cidade?: string;
-  bairro?: string;
+  bairros?: string[];
   transacao?: Transacao;
   tipo?: TipoImovel;
   precoMin?: number;

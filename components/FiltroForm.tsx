@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FiltrosBusca } from "@/lib/types";
 
 interface Props {
@@ -11,37 +11,70 @@ interface Props {
 }
 
 const inputClass =
-  "h-10 w-full rounded-lg border border-zinc-300 bg-transparent px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400";
+  "h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400";
+
+const optionClass = "bg-white text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100";
 
 const labelClass = "block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1";
 
 export default function FiltroForm({ facetas, valores, carregando, onBuscar }: Props) {
   const [local, setLocal] = useState<FiltrosBusca>(valores);
+  const [bairroOpen, setBairroOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const set = (k: keyof FiltrosBusca, v: string) =>
     setLocal((prev) => ({ ...prev, [k]: v || undefined }));
 
+  function toggleBairro(bairro: string) {
+    setLocal((prev) => {
+      const atual = prev.bairros ?? [];
+      const proximo = atual.includes(bairro)
+        ? atual.filter((b) => b !== bairro)
+        : [...atual, bairro];
+      return { ...prev, bairros: proximo.length ? proximo : undefined };
+    });
+  }
+
+  function removeBairro(bairro: string) {
+    const proximo = (local.bairros ?? []).filter((b) => b !== bairro);
+    const atualizado = { ...local, bairros: proximo.length ? proximo : undefined };
+    setLocal(atualizado);
+    onBuscar(atualizado);
+  }
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setBairroOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const bairrosDisponiveis = facetas.bairros.filter(
+    (b) => !(local.bairros ?? []).includes(b),
+  );
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setBairroOpen(false);
     const f: FiltrosBusca = {
       cidade: local.cidade,
-      bairro: local.bairro,
+      bairros: local.bairros,
       transacao: local.transacao,
       tipo: local.tipo,
       precoMin:
-        local.precoMin !== undefined && local.precoMin !== (undefined as unknown as number)
-          ? Number(local.precoMin)
-          : undefined,
+        local.precoMin !== undefined ? Number(local.precoMin) : undefined,
       precoMax:
-        local.precoMax !== undefined && local.precoMax !== (undefined as unknown as number)
-          ? Number(local.precoMax)
-          : undefined,
+        local.precoMax !== undefined ? Number(local.precoMax) : undefined,
     };
     onBuscar(f);
   }
 
   function handleLimpar() {
     setLocal({});
+    setBairroOpen(false);
     onBuscar({});
   }
 
@@ -51,38 +84,83 @@ export default function FiltroForm({ facetas, valores, carregando, onBuscar }: P
       className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Cidade */}
         <div>
           <label className={labelClass}>Cidade</label>
           <select
             className={inputClass}
             value={local.cidade ?? ""}
-            onChange={(e) => set("cidade", e.target.value)}
+            onChange={(e) => {
+              set("cidade", e.target.value);
+              // limpa bairros ao trocar cidade
+              setLocal((prev) => ({ ...prev, cidade: e.target.value || undefined, bairros: undefined }));
+            }}
           >
-            <option value="">Todas as cidades</option>
+            <option value="" className={optionClass}>Todas as cidades</option>
             {facetas.cidades.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+              <option key={c} value={c} className={optionClass}>{c}</option>
             ))}
           </select>
         </div>
 
-        <div>
+        {/* Bairros — multi-select com chips */}
+        <div className="relative" ref={dropdownRef}>
           <label className={labelClass}>Bairro</label>
-          <select
-            className={inputClass}
-            value={local.bairro ?? ""}
-            onChange={(e) => set("bairro", e.target.value)}
+
+          {/* Chips dos bairros selecionados */}
+          {(local.bairros ?? []).length > 0 && (
+            <div className="mb-1.5 flex flex-wrap gap-1">
+              {(local.bairros ?? []).map((b) => (
+                <span
+                  key={b}
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
+                >
+                  {b}
+                  <button
+                    type="button"
+                    onClick={() => removeBairro(b)}
+                    className="ml-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100"
+                    aria-label={`Remover ${b}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Botão para abrir dropdown */}
+          <button
+            type="button"
+            onClick={() => setBairroOpen((v) => !v)}
+            className="flex h-10 w-full items-center justify-between rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="">Todos os bairros</option>
-            {facetas.bairros.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+            <span className="text-zinc-400 dark:text-zinc-500">
+              {bairrosDisponiveis.length === 0 ? "Todos selecionados" : "+ Adicionar bairro"}
+            </span>
+            <svg className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Dropdown de opções */}
+          {bairroOpen && bairrosDisponiveis.length > 0 && (
+            <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+              {bairrosDisponiveis.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => toggleBairro(b)}
+                  className="w-full px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* Transação */}
         <div>
           <label className={labelClass}>Transação</label>
           <select
@@ -90,12 +168,13 @@ export default function FiltroForm({ facetas, valores, carregando, onBuscar }: P
             value={local.transacao ?? ""}
             onChange={(e) => set("transacao", e.target.value)}
           >
-            <option value="">Venda e aluguel</option>
-            <option value="venda">Venda</option>
-            <option value="aluguel">Aluguel</option>
+            <option value="" className={optionClass}>Venda e aluguel</option>
+            <option value="venda" className={optionClass}>Venda</option>
+            <option value="aluguel" className={optionClass}>Aluguel</option>
           </select>
         </div>
 
+        {/* Tipo */}
         <div>
           <label className={labelClass}>Tipo</label>
           <select
@@ -103,15 +182,16 @@ export default function FiltroForm({ facetas, valores, carregando, onBuscar }: P
             value={local.tipo ?? ""}
             onChange={(e) => set("tipo", e.target.value)}
           >
-            <option value="">Todos os tipos</option>
-            <option value="apartamento">Apartamento</option>
-            <option value="casa">Casa</option>
-            <option value="cobertura">Cobertura</option>
-            <option value="kitnet">Kitnet</option>
-            <option value="sobrado">Sobrado</option>
+            <option value="" className={optionClass}>Todos os tipos</option>
+            <option value="apartamento" className={optionClass}>Apartamento</option>
+            <option value="casa" className={optionClass}>Casa</option>
+            <option value="cobertura" className={optionClass}>Cobertura</option>
+            <option value="kitnet" className={optionClass}>Kitnet</option>
+            <option value="sobrado" className={optionClass}>Sobrado</option>
           </select>
         </div>
 
+        {/* Preço mínimo */}
         <div>
           <label className={labelClass}>Preço mínimo (R$)</label>
           <input
@@ -129,6 +209,7 @@ export default function FiltroForm({ facetas, valores, carregando, onBuscar }: P
           />
         </div>
 
+        {/* Preço máximo */}
         <div>
           <label className={labelClass}>Preço máximo (R$)</label>
           <input

@@ -1,4 +1,4 @@
-import type { Lead, ResultadoScore, SinalScore, Tier } from "./types";
+import type { Cortes, Lead, ResultadoScore, SinalScore, Tier } from "./types";
 
 // Score de Captabilidade — DETERMINÍSTICO e explicável. O número não sai de um
 // LLM (precisa ser confiável e estável no demo); o Claude só explica o porquê.
@@ -9,7 +9,14 @@ import type { Lead, ResultadoScore, SinalScore, Tier } from "./types";
 //  - gap vs. mercado  (25) — 54% dos imóveis à venda anunciados ACIMA do preço
 //  - pulverização     (20) — mesmo imóvel em vários portais = sem exclusividade
 
-const PESOS = { dias: 30, reducoes: 25, gap: 25, pulverizacao: 20 } as const;
+export const PESOS = { dias: 30, reducoes: 25, gap: 25, pulverizacao: 20 } as const;
+
+export const CORTES_PADRAO: Cortes = { morno: 40, quente: 66 };
+
+/** Mapeia um score numérico para um tier, usando os cortes configurados. */
+export function classificar(score: number, cortes: Cortes = CORTES_PADRAO): Tier {
+  return score >= cortes.quente ? "quente" : score >= cortes.morno ? "morno" : "frio";
+}
 
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
@@ -99,7 +106,7 @@ export function avaliarLead(lead: Lead): ResultadoScore {
   ];
 
   const score = sinais.reduce((acc, s) => acc + s.pontos, 0);
-  const tier: Tier = score >= 66 ? "quente" : score >= 40 ? "morno" : "frio";
+  const tier: Tier = classificar(score);
 
   const principaisRazoes = [...sinais]
     .sort((a, b) => b.pontos - a.pontos)

@@ -15,9 +15,10 @@ const num = (v: string | null): number | undefined => {
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
 
+  const bairros = sp.getAll("bairros").filter(Boolean);
   const filtros: FiltrosBusca = {
     cidade: str(sp.get("cidade")),
-    bairro: str(sp.get("bairro")),
+    bairros: bairros.length ? bairros : undefined,
     transacao: str(sp.get("transacao")) as FiltrosBusca["transacao"],
     tipo: str(sp.get("tipo")) as FiltrosBusca["tipo"],
     precoMin: num(sp.get("precoMin")),

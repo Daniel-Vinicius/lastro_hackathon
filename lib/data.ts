@@ -30,7 +30,7 @@ const norm = (s: string) =>
 export function buscarLeads(filtros: FiltrosBusca = {}): LeadComScore[] {
   const leads = carregar().filter((l) => {
     if (filtros.cidade && norm(l.cidade) !== norm(filtros.cidade)) return false;
-    if (filtros.bairro && !norm(l.bairro).includes(norm(filtros.bairro)))
+    if (filtros.bairros?.length && !filtros.bairros.some((b) => norm(l.bairro).includes(norm(b))))
       return false;
     if (filtros.transacao && l.transacao !== filtros.transacao) return false;
     if (filtros.tipo && l.tipo !== filtros.tipo) return false;
@@ -49,11 +49,18 @@ export function buscarLeadPorId(id: string): LeadComScore | null {
   return lead ? { ...lead, avaliacao: avaliarLead(lead) } : null;
 }
 
-/** Bairros e cidades presentes no cache — alimenta os filtros da UI. */
-export function facetas(): { cidades: string[]; bairros: string[] } {
+/** Cidades e bairros presentes no cache — alimenta os filtros da UI. */
+export function facetas(): { cidades: string[]; bairrosPorCidade: Record<string, string[]> } {
   const leads = carregar();
-  return {
-    cidades: [...new Set(leads.map((l) => l.cidade))].sort(),
-    bairros: [...new Set(leads.map((l) => l.bairro))].sort(),
-  };
+  const cidades = [...new Set(leads.map((l) => l.cidade))].sort();
+  const bairrosPorCidade: Record<string, string[]> = {};
+  for (const l of leads) {
+    if (!bairrosPorCidade[l.cidade]) bairrosPorCidade[l.cidade] = [];
+    if (!bairrosPorCidade[l.cidade].includes(l.bairro))
+      bairrosPorCidade[l.cidade].push(l.bairro);
+  }
+  for (const c of cidades) bairrosPorCidade[c].sort();
+  // chave "" = todos os bairros (sem filtro de cidade)
+  bairrosPorCidade[""] = [...new Set(leads.map((l) => l.bairro))].sort();
+  return { cidades, bairrosPorCidade };
 }
