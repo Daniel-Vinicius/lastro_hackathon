@@ -40,7 +40,8 @@ pitch ancorado em dado**.
 | Saída estruturada | `messages.parse()` + `zodOutputFormat` |
 | Score | **Determinístico em `lib/score.ts`** — nunca sai do LLM (estabilidade no demo) |
 | **Alvo de scrape** | Primário **Chaves na Mão**, secundário **SP Imóvel** (passaram em `fetch` simples). OLX/Viva Real/ZAP/ImovelWeb bloqueiam (403 + captcha/Cloudflare/DataDome) → descartados |
-| Dados | **Scrape-once → funde no cache JSON** + enriquece; base sintética sempre presente; **nunca** scrape ao vivo no demo |
+| Dados | **Real-only**: `leads.json` = scrape de Chaves na Mão + SP Imóvel (enriquecido); `gen-data.mjs` vira só fallback. **Nunca** scrape ao vivo no demo |
+| Dado real vs. enriquecido | REAL: preço, área, bairro, tipo, foto, link. ENRIQUECIDO: histórico/dias/reduções. **Portais = só o portal verificado** (sem pulverização inventada); o "calor" é atribuído pelo **gap real** vs. mediana do bairro |
 | Core inegociável | Lista com score (Tela A) + Ficha com IA "por que abordar" (Tela B) |
 
 ---
